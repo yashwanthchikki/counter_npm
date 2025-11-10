@@ -1,13 +1,20 @@
-import counter from "./src/index.js";
+import ThreeStateCounter from "./core.js";
 
-counter.setup("views", 0, 1, 5);
-counter.setup("likes", 10, 2, 3);
+async function main() {
+  const counter = new ThreeStateCounter({
+    dbPath: "counter.db",
+    logPath: "counter.log",
+    flushEvery: 5,
+  });
 
-counter.views();
-counter.views();
-counter.likes();
+  await counter.init(); // <-- required now!
 
-console.log("Views:", counter.views.value);
-console.log("Likes:", counter.likes.value);
+  counter.increment();
+  counter.increment(2);
+  console.log("Value:", counter.getValue());
 
-counter.flushAll();
+  await counter.flush();
+  await counter.close();
+}
+
+main();

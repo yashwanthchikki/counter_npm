@@ -1,41 +1,43 @@
-🧮 three-state-counter
-by Yashwanth Chikki H.D.
+cat > README.md << 'EOF'
+# 🧮 three-state-counter  
+**by Yashwanth Chikki H.D.**
 
 A lightweight, crash-safe, and persistent counter for Node.js — built with three layers of reliability:
 
-⚡ In-Memory Counter → Ultra-fast reads & writes
-
-🧾 Append-Only Log File → Crash recovery without overhead
-
-💾 SQLite Snapshot → Permanent, durable state
+- ⚡ **In-Memory Counter** → Ultra-fast reads & writes  
+- 🧾 **Append-Only Log File** → Crash recovery without overhead  
+- 💾 **SQLite Snapshot** → Permanent, durable state  
 
 No Redis. No setup. Just install, import, and go.
 
-🚀 Why Use three-state-counter?
+---
+
+## 🚀 Why Use *three-state-counter*?
 
 When you only need a simple persistent counter, not an entire database or Redis instance.
 
 Perfect for:
 
-Page views / download counts
+- Page views / download counts  
+- API rate tracking  
+- IoT / analytics counters  
+- Lightweight caching of incrementing data  
+- Any small app needing speed + safety  
 
-API rate tracking
+---
 
-IoT / analytics counters
-
-Lightweight caching of incrementing data
-
-Any small app needing speed + safety
-
-⚙️ Installation
+## ⚙️ Installation
+```bash
 npm install three-state-counter
+```
 
-🧩 Quick Start Example
+## 🧩 Quick Start Example
+```javascript
 import counter from "three-state-counter";
 
 // Create persistent counters
-counter.setup("views", 0, 1);       // (name, initialValue, jumpValue)
-counter.setup("likes", 10, 2, 5);   // flushes to disk every 5 ops
+await counter.setup("views", 0, 1);       // (name, initialValue, jumpValue)
+await counter.setup("likes", 10, 2, 5);   // flushes to disk every 5 ops
 
 // Use them like functions
 counter.views();  // increments by +1
@@ -45,147 +47,173 @@ console.log(counter.views.value);   // => 1
 console.log(counter.likes.value);   // => 12
 
 // Persist to disk manually (optional)
-counter.flushAll();
+await counter.flushAll();
+```
 
+🧠 On restart, all counter values automatically recover — even after a crash.
 
-🧠 Next time your app restarts, the counter values automatically recover — even if you crashed mid-update.
+---
 
-🧱 How It Works
+## 🧱 How It Works
 
 Your counter operates on three layers:
 
-Layer	Purpose	Behavior
-🧠 In-memory	Fast access and updates	Reads/writes happen instantly
-🧾 Log file (.log)	Write-ahead logging	Stores unflushed operations
-💾 SQLite DB	Long-term storage	Stores last committed state
-Data Flow
+| Layer | Purpose | Behavior |
+|-------|---------|----------|
+| 🧠 In-memory | Fast access and updates | Reads/writes happen instantly |
+| 🧾 Log file (.log) | Write-ahead logging | Stores unflushed operations |
+| 💾 SQLite DB | Long-term storage | Stores last committed state |
 
-Each increment → updates memory + appends to log file
+**Data Flow:**
 
-Every flushEvery ops → writes to SQLite and clears log
+1. Each increment updates memory + appends to log file
+2. Every `flushEvery` ops → writes to SQLite + clears log
+3. On startup → SQLite loads → log replays → state recovered
 
-On startup → SQLite loads, log is replayed, state recovered
+That's how it stays fast, safe, and durable.
 
-That’s how it stays fast, safe, and durable.
+---
 
-📘 API Reference
-counter.setup(name, initial = 0, jump = 1, flushEvery = 10)
+## 📘 API Reference
 
-Creates (or loads) a persistent counter.
+### counter.setup(name, initial = 0, jump = 1, flushEvery = 10)
 
-Parameter	Type	Default	Description
-name	string	—	Unique counter name
-initial	number	0	Starting value if new
-jump	number	1	Increment amount per call
-flushEvery	number	10	Number of updates before flushing to SQLite
-Example
-const downloads = counter.setup("downloads", 0, 5, 3);
+Creates or loads a persistent counter.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| name | string | — | Unique counter name |
+| initial | number | 0 | Starting value if new |
+| jump | number | 1 | Increment amount per call |
+| flushEvery | number | 10 | Number of updates before flushing to SQLite |
+
+**Example:**
+```javascript
+const downloads = await counter.setup("downloads", 0, 5, 3);
 
 downloads(); // +5 → 5
 downloads(); // +5 → 10
 console.log(downloads.value); // => 10
+```
 
-Counter Function
+### Counter Functions
 
-Every counter created with setup() is callable like a function.
-
-Example
-counter.setup("visits", 0, 1);
+Every counter created with `setup()` is callable like a function.
+```javascript
+await counter.setup("visits", 0, 1);
 counter.visits();   // increments
 counter.visits();   // increments again
 console.log(counter.visits.value); // => 2
+```
 
+Each counter instance provides:
 
-Each counter instance has the following methods and properties:
+| Method / Property | Type | Description |
+|-------------------|------|-------------|
+| counter.name() | function | Increments by jump and returns new value |
+| counter.name.value | number | Current in-memory value |
+| counter.name.flush() | function | Forces immediate persistence to SQLite |
+| counter.name.reset(value) | function | Resets to specific value and persists it |
 
-Method / Property	Type	Description
-counter.name()	function	Increments by jump and returns new value
-counter.name.value	number	Current in-memory value
-counter.name.flush()	function	Forces immediate persistence to SQLite
-counter.name.reset(value)	function	Resets to a specific value and persists it
-Global Manager Methods
-Method	Description
-counter.list()	Returns all counter names currently active
-counter.flushAll()	Flushes every counter to SQLite
-counter.closeAll()	Gracefully closes all open counter connections
-Example:
-counter.flushAll();
+### Global Manager Methods
+
+| Method | Description |
+|--------|-------------|
+| counter.list() | Returns all counter names currently active |
+| counter.flushAll() | Flushes every counter to SQLite |
+| counter.closeAll() | Gracefully closes all open counters |
+
+**Example:**
+```javascript
+await counter.flushAll();
 console.log(counter.list()); // ['views', 'likes', 'downloads']
+```
 
-🧾 Example Use Cases
-1. Page View Tracker
-counter.setup("pageViews", 0, 1);
+---
+
+## 🧾 Example Use Cases
+
+### 1️⃣ Page View Tracker
+```javascript
+await counter.setup("pageViews", 0, 1);
 counter.pageViews(); // call this every visit
 console.log("Total views:", counter.pageViews.value);
+```
 
-2. Lightweight Rate Counter
-counter.setup("apiHits", 0, 1, 20);
+### 2️⃣ Lightweight Rate Counter
+```javascript
+await counter.setup("apiHits", 0, 1, 20);
 counter.apiHits(); // increment per request
+```
 
-3. IoT Sensor Count
-counter.setup("sensorCount", 100, 10);
+### 3️⃣ IoT Sensor Count
+```javascript
+await counter.setup("sensorCount", 100, 10);
 counter.sensorCount(); // adds 10
+```
 
-⚡ Performance Notes
+---
 
-Log writes are append-only, so they’re extremely fast
+## ⚡ Performance Notes
 
-No fsync on every write (uses OS caching for speed)
+- Log writes are append-only → extremely fast
+- No fsync on every write → uses OS caching
+- SQLite flushes are infrequent (batched via `flushEvery`)
+- Ideal for small to moderate workloads
 
-SQLite flush is infrequent and batched (flushEvery)
+---
 
-Ideal for small to moderate workloads
-
-🧩 File Structure
-
-At runtime, these files are created automatically:
-
+## 🧩 File Structure (Runtime)
+```
 three-state-counter/
 ├── counter.db      ← SQLite database (persistent)
-├── views.log       ← Append-only log for “views” counter
-├── likes.log       ← Append-only log for “likes” counter
+├── views.log       ← Append-only log for "views" counter
+├── likes.log       ← Append-only log for "likes" counter
 └── ...
+```
 
-
-You can safely .gitignore these:
-
+Add these to `.gitignore`:
+```
 *.db
 *.log
+```
 
-💾 Persistence Example
+---
+
+## 💾 Crash Recovery Example
 
 If your app crashes during updates:
 
-Logs remain on disk
+1. Logs remain on disk
+2. On restart → SQLite loads previous snapshot
+3. Log entries replay automatically
 
-On restart, counters load from DB
+✅ **Result:** no data loss
 
-Log entries replay → full recovery
+---
 
-Result: No data loss.
+## 🧠 Design Inspiration
 
-🧠 Design Inspiration
+Inspired by architectures like:
 
-This library takes cues from proven architectures:
+- Redis AOF + RDB Hybrid (log + snapshot)
+- RocksDB Write-Ahead Logs
+- PostgreSQL WAL
 
-Redis AOF + RDB hybrid (log + snapshot)
+Simplified for single-process Node.js apps.
 
-RocksDB write-ahead logs
+---
 
-PostgreSQL WAL durability model
+## 🧰 Tech Stack
 
-But simplified for single-process Node.js apps.
+- Node.js (ES Modules)
+- SQLite (`sqlite` + `sqlite3`) — no native compilation required
+- Native `fs` module for logging
 
-🧰 Tech Stack
+---
 
-Node.js (ES Modules)
-
-better-sqlite3
- – for embedded persistence
-
-Native fs module for lightweight append logging
-
-🧱 Project Structure
+## 🧱 Project Structure
+```
 three-state-counter/
 ├── package.json
 ├── README.md
@@ -194,18 +222,21 @@ three-state-counter/
 └── src/
     ├── core.js      ← Core counter logic
     └── index.js     ← Public API (CounterManager)
+```
 
-📦 Installation for Contributors
+---
+
+## 📦 Installation for Contributors
+```bash
 git clone https://github.com/yashwanthchikki/three-state-counter.git
 cd three-state-counter
 npm install
-
-
-Run a test:
-
 node test.js
+```
 
-🧾 License
+---
+
+## 🧾 License
 
 MIT License
 
@@ -224,10 +255,13 @@ copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
 
-💬 Author
+---
 
-👤 Yashwanth Chikki H.D.
-📧 [Your Email or GitHub Profile]
-💻 Developer, AI/ML Enthusiast, Systems Engineer
-📧 [yashwanthchikkihd@gmail.com](mailto:yashwanthchikkihd@gmail.com)
+## 💬 Author
+
+👤 **Yashwanth Chikki H.D.**  
+📧 yashwanthchikkihd@gmail.com  
 💻 [GitHub – yashwanthchikki](https://github.com/yashwanthchikki)
+
+🧠 Developer · AI/ML Enthusiast · Systems Engineer
+EOF

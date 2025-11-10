@@ -1,5 +1,6 @@
 import fs from "fs";
-import Database from "better-sqlite3";
+import sqlite3 from "sqlite";
+import sqlite3Driver from "sqlite3";
 
 export default class ThreeStateCounter {
   constructor({
@@ -13,32 +14,40 @@ export default class ThreeStateCounter {
 
     this.value = 0;       // in-memory counter
     this.pending = 0;     // unflushed operations
-
-    this._initDB();       // ensure DB schema
-    this._loadState();    // load last flushed value
-    this._replayLog();    // recover from crash
+    this.db = null;       // will be initialized asynchronously
   }
 
   // ---------- Setup & Recovery ----------
 
-  _initDB() {
-    this.db = new Database(this.dbPath);
-    this.db.prepare(`
+  async init() {
+    await this._initDB();
+    await this._loadState();
+    this._replayLog();
+  }
+
+  async _initDB() {
+    this.db = await sqlite3.open({
+      filename: this.dbPath,
+      driver: sqlite3Driver.Database,
+    });
+
+    await this.db.exec(`
       CREATE TABLE IF NOT EXISTS counter_state (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         value INTEGER NOT NULL
       )
-    `).run();
-    this.db.prepare(
+    `);
+
+    await this.db.run(
       "INSERT OR IGNORE INTO counter_state (id, value) VALUES (1, 0)"
-    ).run();
+    );
   }
 
-  _loadState() {
-    const row = this.db.prepare(
+  async _loadState() {
+    const row = await this.db.get(
       "SELECT value FROM counter_state WHERE id = 1"
-    ).get();
-    this.value = row.value;
+    );
+    this.value = row?.value ?? 0;
   }
 
   _replayLog() {
@@ -57,7 +66,6 @@ export default class ThreeStateCounter {
   // ---------- Core Operations ----------
 
   _logOperation(delta) {
-    // Append to file — cheap, buffered write
     fs.appendFileSync(this.logPath, `${delta}\n`);
   }
 
@@ -81,18 +89,18 @@ export default class ThreeStateCounter {
 
   // ---------- Flush to Persistent DB ----------
 
-  flush() {
-    this.db.prepare(
-      "UPDATE counter_state SET value = ? WHERE id = 1"
-    ).run(this.value);
-
-    // Clear log (all ops persisted)
+  async flush() {
+    if (!this.db) return;
+    await this.db.run(
+      "UPDATE counter_state SET value = ? WHERE id = 1",
+      this.value
+    );
     fs.writeFileSync(this.logPath, "");
     this.pending = 0;
   }
 
-  close() {
-    this.flush();
-    this.db.close();
+  async close() {
+    await this.flush();
+    await this.db.close();
   }
 }
