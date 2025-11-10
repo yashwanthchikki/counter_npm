@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write  # changed to write for version bump
   id-token: write
 
 jobs:
@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -23,11 +25,19 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org/
 
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Install dependencies
         run: npm install
 
-      - name: Build (optional)
-        run: echo "No build step defined."
+      - name: Bump version
+        run: npm version patch -m "chore: bump version to %s [skip ci]"
+
+      - name: Push version bump
+        run: git push && git push --tags
 
       - name: Publish to npm
         run: npm publish --provenance --access public
