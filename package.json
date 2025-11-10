@@ -1,6 +1,6 @@
 {
   "name": "three-state-counter",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A lightweight, crash-safe, persistent counter for Node.js using in-memory + log + SQLite layers.",
   "type": "module",
   "main": "src/index.js",
@@ -16,6 +16,5 @@
   ],
   "dependencies": {
     "sqlite": "^5.1.1"
-
   }
 }
