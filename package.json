@@ -1,0 +1,20 @@
+{
+  "name": "three-state-counter",
+  "version": "1.0.0",
+  "description": "A lightweight, crash-safe, persistent counter for Node.js using in-memory + log + SQLite layers.",
+  "type": "module",
+  "main": "src/index.js",
+  "author": "Yashwanth Chikki H.D.",
+  "license": "MIT",
+  "keywords": [
+    "counter",
+    "persistent",
+    "sqlite",
+    "logging",
+    "lightweight",
+    "npm-package"
+  ],
+  "dependencies": {
+    "better-sqlite3": "^9.0.0"
+  }
+}
