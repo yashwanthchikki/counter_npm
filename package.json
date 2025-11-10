@@ -1,21 +1,48 @@
 {
   "name": "three-state-counter",
-  "version": "1.0.2",
-  "description": "A lightweight, crash-safe, persistent counter for Node.js using in-memory + log + SQLite layers.",
+  "version": "2.0.0",
+  "description": "A lightweight, crash-safe, persistent counter for Node.js with sync/async modes using in-memory + WAL + SQLite layers.",
   "type": "module",
   "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./core": "./src/core.js"
+  },
+  "scripts": {
+    "example:basic": "node examples/basic.js",
+    "example:modes": "node examples/modes.js",
+    "example:performance": "node examples/performance.js",
+    "test": "node test/counter.test.js"
+  },
   "author": "Yashwanth Chikki H.D.",
   "license": "MIT",
   "keywords": [
     "counter",
     "persistent",
     "sqlite",
-    "logging",
+    "wal",
+    "write-ahead-log",
+    "crash-safe",
+    "async",
+    "sync",
     "lightweight",
-    "npm-package"
+    "fast-counter",
+    "metrics",
+    "analytics"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/three-state-counter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/three-state-counter/issues"
+  },
+  "homepage": "https://github.com/yourusername/three-state-counter#readme",
   "dependencies": {
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }

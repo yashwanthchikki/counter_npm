@@ -1,4 +1,5 @@
 import fs from "fs";
+import { promises as fsPromises } from "fs";
 import sqlite3 from "sqlite";
 import sqlite3Driver from "sqlite3";
 
@@ -7,14 +8,25 @@ export default class ThreeStateCounter {
     dbPath = "counter.db",
     logPath = "counter.log",
     flushEvery = 10,
+    mode = "async", // "sync" or "async"
   } = {}) {
     this.dbPath = dbPath;
     this.logPath = logPath;
     this.flushEvery = flushEvery;
+    this.mode = mode;
 
-    this.value = 0;       // in-memory counter
-    this.pending = 0;     // unflushed operations
-    this.db = null;       // will be initialized asynchronously
+    this.value = 0;
+    this.pending = 0;
+    this.db = null;
+
+    // For async mode: batch writes
+    this.writeBuffer = [];
+    this.flushTimer = null;
+    this.isWriting = false;
+
+    if (mode !== "sync" && mode !== "async") {
+      throw new Error('mode must be "sync" or "async"');
+    }
   }
 
   // ---------- Setup & Recovery ----------
@@ -22,7 +34,7 @@ export default class ThreeStateCounter {
   async init() {
     await this._initDB();
     await this._loadState();
-    this._replayLog();
+    await this._replayLog();
   }
 
   async _initDB() {
@@ -50,27 +62,82 @@ export default class ThreeStateCounter {
     this.value = row?.value ?? 0;
   }
 
-  _replayLog() {
-    if (!fs.existsSync(this.logPath)) return;
+  async _replayLog() {
+    try {
+      if (!fs.existsSync(this.logPath)) return;
 
-    const lines = fs.readFileSync(this.logPath, "utf8").trim().split("\n");
-    for (const line of lines) {
-      if (!line) continue;
-      this.value += parseInt(line, 10);
+      const content = await fsPromises.readFile(this.logPath, "utf8");
+      const lines = content.trim().split("\n");
+
+      for (const line of lines) {
+        if (!line) continue;
+        const delta = parseInt(line, 10);
+        if (!isNaN(delta)) {
+          this.value += delta;
+        }
+      }
+
+      // Log replayed; clear it
+      await fsPromises.writeFile(this.logPath, "");
+    } catch (err) {
+      console.error("Error replaying log:", err);
     }
-
-    // Log has been replayed; we can safely clear it.
-    fs.writeFileSync(this.logPath, "");
   }
 
   // ---------- Core Operations ----------
 
-  _logOperation(delta) {
-    fs.appendFileSync(this.logPath, `${delta}\n`);
+  _logOperationSync(delta) {
+    try {
+      fs.appendFileSync(this.logPath, `${delta}\n`);
+    } catch (err) {
+      console.error("Error writing to log (sync):", err);
+      throw err;
+    }
+  }
+
+  async _logOperationAsync(delta) {
+    // Add to buffer
+    this.writeBuffer.push(delta);
+
+    // Schedule a flush if not already scheduled
+    if (!this.flushTimer) {
+      this.flushTimer = setTimeout(() => this._flushWriteBuffer(), 50);
+    }
+  }
+
+  async _flushWriteBuffer() {
+    if (this.isWriting || this.writeBuffer.length === 0) return;
+
+    this.isWriting = true;
+    this.flushTimer = null;
+
+    const toWrite = [...this.writeBuffer];
+    this.writeBuffer = [];
+
+    try {
+      const content = toWrite.join("\n") + "\n";
+      await fsPromises.appendFile(this.logPath, content);
+    } catch (err) {
+      console.error("Error writing to log (async):", err);
+      // Put failed writes back in buffer
+      this.writeBuffer.unshift(...toWrite);
+    } finally {
+      this.isWriting = false;
+      
+      // If more writes came in while we were writing, schedule another flush
+      if (this.writeBuffer.length > 0 && !this.flushTimer) {
+        this.flushTimer = setTimeout(() => this._flushWriteBuffer(), 50);
+      }
+    }
   }
 
   increment(delta = 1) {
-    this._logOperation(delta);
+    if (this.mode === "sync") {
+      this._logOperationSync(delta);
+    } else {
+      this._logOperationAsync(delta); // Fire and forget
+    }
+
     this.value += delta;
     this.pending++;
 
@@ -91,15 +158,38 @@ export default class ThreeStateCounter {
 
   async flush() {
     if (!this.db) return;
-    await this.db.run(
-      "UPDATE counter_state SET value = ? WHERE id = 1",
-      this.value
-    );
-    fs.writeFileSync(this.logPath, "");
-    this.pending = 0;
+
+    try {
+      // If async mode, ensure buffered writes are flushed first
+      if (this.mode === "async") {
+        await this._flushWriteBuffer();
+      }
+
+      await this.db.run(
+        "UPDATE counter_state SET value = ? WHERE id = 1",
+        this.value
+      );
+
+      await fsPromises.writeFile(this.logPath, "");
+      this.pending = 0;
+    } catch (err) {
+      console.error("Error flushing to database:", err);
+      throw err;
+    }
   }
 
   async close() {
+    // Clear any pending flush timer
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+
+    // Ensure all writes are flushed
+    if (this.mode === "async") {
+      await this._flushWriteBuffer();
+    }
+
     await this.flush();
     await this.db.close();
   }

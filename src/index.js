@@ -11,17 +11,26 @@ class CounterManager {
    * @param {number} [initial=0] - Starting value.
    * @param {number} [jump=1] - Increment amount.
    * @param {number} [flushEvery=10] - Number of ops before flush to SQLite.
+   * @param {string} [mode="async"] - "sync" (blocking, safer) or "async" (parallel, faster).
    */
-  setup(name, initial = 0, jump = 1, flushEvery = 10) {
+  async setup(name, initial = 0, jump = 1, flushEvery = 10, mode = "async") {
     if (this.registry[name]) return this.registry[name];
 
     const counterInstance = new ThreeStateCounter({
       dbPath: "counter.db",
       logPath: `${name}.log`,
       flushEvery,
+      mode,
     });
 
-    counterInstance.value = initial;
+    // CRITICAL: Initialize async
+    await counterInstance.init();
+    
+    // Set initial value after loading state
+    if (initial !== 0) {
+      counterInstance.value = initial;
+      await counterInstance.flush();
+    }
 
     // Define callable function
     const fn = () => {
@@ -35,11 +44,12 @@ class CounterManager {
       },
     });
 
-    fn.flush = () => counterInstance.flush();
-    fn.reset = (val = 0) => {
+    fn.flush = async () => await counterInstance.flush();
+    fn.reset = async (val = 0) => {
       counterInstance.value = val;
-      counterInstance.flush();
+      await counterInstance.flush();
     };
+    fn.close = async () => await counterInstance.close();
 
     this.registry[name] = fn;
     this[name] = fn;
@@ -51,12 +61,16 @@ class CounterManager {
     return Object.keys(this.registry);
   }
 
-  flushAll() {
-    for (const fn of Object.values(this.registry)) fn.flush();
+  async flushAll() {
+    await Promise.all(
+      Object.values(this.registry).map((fn) => fn.flush())
+    );
   }
 
-  closeAll() {
-    for (const fn of Object.values(this.registry)) fn.flush();
+  async closeAll() {
+    await Promise.all(
+      Object.values(this.registry).map((fn) => fn.close())
+    );
   }
 }
 
