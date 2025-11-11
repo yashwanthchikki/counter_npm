@@ -1,6 +1,6 @@
 # Three-State Counter
 
-**Lightning-fast, crash-safe persistent counters for Node.js** — No Redis required. No native dependencies. Just pure JavaScript magic.
+**Lightning-fast, crash-safe persistent counters for Node.js** — No Redis required. No native dependencies. Just pure JavaScript .
 
 [![npm version](https://img.shields.io/npm/v/three-state-counter.svg)](https://www.npmjs.com/package/three-state-counter)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -420,5 +420,6 @@ MIT © Yashwanth Chikki H.D.
 ---
 
 **Made with ☕ by developers who are tired of installing Redis for simple counters.**
+
 
 If this saved you time, give it a ⭐ on GitHub!
