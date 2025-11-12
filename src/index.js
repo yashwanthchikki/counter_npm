@@ -3,6 +3,7 @@ import ThreeStateCounter from "./core.js";
 class CounterManager {
   constructor() {
     this.registry = {};
+    this.instances = {}; // Store the actual counter instances
   }
 
   /**
@@ -17,7 +18,7 @@ class CounterManager {
     if (this.registry[name]) return this.registry[name];
 
     const counterInstance = new ThreeStateCounter({
-      dbPath: "counter.db",
+      dbPath: `${name}.db`, // Unique DB per counter!
       logPath: `${name}.log`,
       flushEvery,
       mode,
@@ -27,7 +28,8 @@ class CounterManager {
     await counterInstance.init();
     
     // Set initial value after loading state
-    if (initial !== 0) {
+    // Only override if the loaded state is 0 and we want a different initial value
+    if (counterInstance.value === 0 && initial !== 0) {
       counterInstance.value = initial;
       await counterInstance.flush();
     }
@@ -44,14 +46,27 @@ class CounterManager {
       },
     });
 
-    fn.flush = async () => await counterInstance.flush();
+    fn.flush = async () => {
+      if (counterInstance.db && counterInstance.db.open) {
+        await counterInstance.flush();
+      }
+    };
+    
     fn.reset = async (val = 0) => {
       counterInstance.value = val;
-      await counterInstance.flush();
+      if (counterInstance.db && counterInstance.db.open) {
+        await counterInstance.flush();
+      }
     };
-    fn.close = async () => await counterInstance.close();
+    
+    fn.close = async () => {
+      if (counterInstance.db && counterInstance.db.open) {
+        await counterInstance.close();
+      }
+    };
 
     this.registry[name] = fn;
+    this.instances[name] = counterInstance; // Store instance reference
     this[name] = fn;
 
     return fn;
@@ -62,15 +77,31 @@ class CounterManager {
   }
 
   async flushAll() {
-    await Promise.all(
-      Object.values(this.registry).map((fn) => fn.flush())
-    );
+    const flushPromises = [];
+    for (const [name, instance] of Object.entries(this.instances)) {
+      if (instance && instance.db && instance.db.open) {
+        flushPromises.push(instance.flush().catch(err => {
+          console.error(`Error flushing ${name}:`, err.message);
+        }));
+      }
+    }
+    await Promise.all(flushPromises);
   }
 
   async closeAll() {
-    await Promise.all(
-      Object.values(this.registry).map((fn) => fn.close())
-    );
+    const closePromises = [];
+    for (const [name, instance] of Object.entries(this.instances)) {
+      if (instance && instance.db && instance.db.open) {
+        closePromises.push(instance.close().catch(err => {
+          console.error(`Error closing ${name}:`, err.message);
+        }));
+      }
+    }
+    await Promise.all(closePromises);
+    
+    // Clear registries
+    this.registry = {};
+    this.instances = {};
   }
 }
 

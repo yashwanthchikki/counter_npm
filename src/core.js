@@ -1,7 +1,7 @@
 import fs from "fs";
 import { promises as fsPromises } from "fs";
-import sqlite3 from "sqlite";
-import sqlite3Driver from "sqlite3";
+import { open } from "sqlite";
+import sqlite3 from "sqlite3";
 
 export default class ThreeStateCounter {
   constructor({
@@ -38,9 +38,9 @@ export default class ThreeStateCounter {
   }
 
   async _initDB() {
-    this.db = await sqlite3.open({
+    this.db = await open({
       filename: this.dbPath,
-      driver: sqlite3Driver.Database,
+      driver: sqlite3.Database,
     });
 
     await this.db.exec(`
@@ -157,7 +157,7 @@ export default class ThreeStateCounter {
   // ---------- Flush to Persistent DB ----------
 
   async flush() {
-    if (!this.db) return;
+    if (!this.db || !this.db.open) return; // Skip if DB is closed
 
     try {
       // If async mode, ensure buffered writes are flushed first
