@@ -32,12 +32,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/three-state-counter.git"
+    "url": "https://github.com/yashwanthchikki/counter_npm"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/three-state-counter/issues"
+    "url": "https://github.com/yashwanthchikki/"
   },
-  "homepage": "https://github.com/yourusername/three-state-counter#readme",
+  "homepage": "https://github.com/yashwanthchikki/counter_npm/blob/main/README.md",
   "dependencies": {
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7"
